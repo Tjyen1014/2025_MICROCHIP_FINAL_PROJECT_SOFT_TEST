@@ -55,7 +55,7 @@ void INPUT_CHECK(void){//
 }
 
 void INPUT_CHECK_2(void){
-    printf("請輸輸入0 - 9 (用空白分隔) wam 數字: ");
+    printf("請輸輸入0 - 9 wam 數字: ");
     scanf(" %c",&INPUT_TABLE.input_char);
     UART_INTERUPT();
 
