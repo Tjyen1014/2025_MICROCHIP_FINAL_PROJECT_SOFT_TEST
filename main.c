@@ -42,7 +42,7 @@ void CLEAR_PRESS(volatile GAME_CONTROL_TABLE *GC){
 }
 
 void INPUT_CHECK(void){//
-    printf("請輸入2個整數 (用空白或換行分隔)b1 b2: ");
+    printf("請輸入2個整數 (用空白分隔)b1 b2: ");
     scanf("%d %d", &INPUT_TABLE.button_1, &INPUT_TABLE.button_2);
     if(INPUT_TABLE.button_1 == 1 && INPUT_TABLE.button_2 == 0){
         BUTTON1_INTERUPT();
@@ -55,7 +55,7 @@ void INPUT_CHECK(void){//
 }
 
 void INPUT_CHECK_2(void){
-    printf("請輸輸入0 - 9 (用空白或換行分隔) wam 數字: ");
+    printf("請輸輸入0 - 9 (用空白分隔) wam 數字: ");
     scanf(" %c",&INPUT_TABLE.input_char);
     UART_INTERUPT();
 
