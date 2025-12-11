@@ -1,0 +1,458 @@
+//#include <xc.h>
+#include <stdio.h>       
+#include "INTERFACE.h"
+
+#pragma config OSC = INTIO67 // Oscillator Selection bits
+#pragma config WDT = OFF     // Watchdog Timer Enable bit
+#pragma config PWRT = OFF    // Power-up Enable bit
+#pragma config BOREN = ON    // Brown-out Reset Enable bit
+#pragma config PBADEN = OFF  // Watchdog Timer Enable bit
+#pragma config LVP = OFF     // Low Voltage (single -supply) In-Circute Serial Pragramming Enable bit
+#pragma config CPD = OFF     // Data EEPROM?Memory Code Protection bit (Data EEPROM code protection off)
+
+
+typedef struct{
+    int button_1;
+    int button_2;
+    int adc_value;
+    char input_char;
+}INPUT;
+
+
+volatile GAME_CONTROL_TABLE GC_TABLE;
+volatile TTT_OUTPUT_TABLE TTTO_TABLE;
+volatile REACTION_OUTPUT_TABLE REACTO_TABLE;
+volatile WHAC_A_MOLE_OUTPUT_TABLE WAWO_TABLE;
+volatile END_OUTPUT_TABLE EO_TABLE;
+volatile HINT_OUTPUT_TABLE HO_TABLE;
+volatile INPUT INPUT_TABLE;
+
+
+
+void delay(volatile unsigned long t) {
+    while (t--) {
+    }
+    return;
+}
+
+void CLEAR_PRESS(volatile GAME_CONTROL_TABLE *GC){
+    GC->P1_PRESS = 0;
+    GC->P2_PRESS = 0;
+    return;
+}
+
+void INPUT_CHECK(void){//
+    printf("請輸入2個整數 (用空白或換行分隔)b1 b2: ");
+    scanf("%d %d", &INPUT_TABLE.button_1, &INPUT_TABLE.button_2);
+    if(INPUT_TABLE.button_1 == 1 && INPUT_TABLE.button_2 == 0){
+        BUTTON1_INTERUPT();
+    }
+    else if(INPUT_TABLE.button_1 == 0 && INPUT_TABLE.button_2 == 1){
+        BUTTON2_INTERUPT();
+    }
+    INPUT_TABLE_INITIALIZE();
+    return;
+}
+
+void INPUT_CHECK_2(void){
+    printf("請輸輸入0 - 9 (用空白或換行分隔) wam 數字: ");
+    scanf(" %c",&INPUT_TABLE.input_char);
+    UART_INTERUPT();
+
+}
+/*void CONFIG_INITIALIZE(void){
+
+    //output input configuration
+    TRISB = 0b00000011; // two button
+    TRISA = 1; //adc ouput
+
+    //ADC and ADC INTERUPt SETTING
+    ADCON2 = 0b00001000;
+    ADCON1 = 0b00001110;
+    ADCON0 = 0b00000001;
+
+    PIE1bits.ADIE = 0;
+    PIR1bits.ADIF = 0;
+    IPR1bits.ADIP = 0;
+
+    //BUTTON INTERUPT SETTING
+    INTCONbits.INT0IF = 0; // button 1 RB 0
+    INTCONbits.INT0IE = 1;
+    INTCON3bits.INT1IF = 0; //button 2 RB 1
+    INTCON3bits.INT1IE = 1;
+    INTCON3bits.INT1IP = 1;
+
+    //TIMER INTERUPT SETTIMH
+    PIR1bits.TMR2IF = 0;
+    PIE1bits.TMR2IE = 1;
+    IPR1bits.TMR2IP = 0;
+    PR2 = 1;  
+    T2CON = 0b01111011; //  t2con 還未啓動
+
+
+    //GENERAL INTERUPRT SETTING
+    RCONbits.IPEN = 1;
+    INTCONbits.GIEH = 1;
+    INTCONbits.GIEL = 1;
+
+    return;
+
+}*/
+
+void GC_TABLE_INITIALIZE(void){
+    GC_TABLE.ADC_VALUE = 0;
+    GC_TABLE.GAME_STATE = 0;
+    GC_TABLE.P1_PRESS = 0;
+    GC_TABLE.P2_PRESS = 0;
+    GC_TABLE.PROCESS = -1;
+}
+
+
+void EO_TABLE_INITIALIZE(void){
+    EO_TABLE.P1_WIN_AMOUNT = 0;
+    EO_TABLE.P2_WIN_AMOUNT = 0;
+    EO_TABLE.WHO_WIN = -1;
+}
+
+void REACTION_OUTPUT_TABLE_INITIALIZE(void){
+    REACTO_TABLE.PLAYER1_STATE = 0;
+    REACTO_TABLE.PLAYER2_STATE = 0;
+    REACTO_TABLE.tick100us = 0;
+    REACTO_TABLE.WINNER = -1;
+}
+void WHAC_A_MOLE_OUTPUT_TABLE_INITIALIZE(void){
+	WAWO_TABLE.SCORE_P1 = 0;
+    WAWO_TABLE.SCORE_P2 = 0;
+	//WAWO_TABLE.WHAC_A_MOLE[9];
+	 WAWO_TABLE.INPUT = 'N';
+	WAWO_TABLE.HIT = 0;
+	WAWO_TABLE.MISS = 0;
+	WAWO_TABLE.NOT_HIT_NOT_MISS = 0;
+	WAWO_TABLE.REMAINING_TIME = 0; // 0.001us 
+    WAWO_TABLE.WINNER = -1;
+    WAWO_TABLE.tick100us= 0 ;//0.001s
+	WAWO_TABLE.PLAYER1_STATE = 0;
+	WAWO_TABLE.PLAYER2_STATE= 0;
+
+}
+
+void INPUT_TABLE_INITIALIZE(void){
+    INPUT_TABLE.adc_value = -1;
+    INPUT_TABLE.button_1 = 0;
+    INPUT_TABLE.button_2 = 0;
+    INPUT_TABLE.input_char = '\0' ;
+}
+
+HINT_OUTPUT_TABLE WRITE_HO_TABLE(void){
+    HINT_OUTPUT_TABLE HO_TABLE_R;
+    HO_TABLE_R.GAME_STATE = GC_TABLE.GAME_STATE;
+    HO_TABLE_R.P1_PREPARE = GC_TABLE.P1_PRESS;
+    HO_TABLE_R.P2_PREPARE = GC_TABLE.P2_PRESS;
+    return HO_TABLE_R;
+}
+
+
+
+void PROCESS_HINT(void){
+    while(GC_TABLE.P1_PRESS != 1 || GC_TABLE.P2_PRESS != 1){
+        INPUT_CHECK();
+        HO_TABLE = WRITE_HO_TABLE();
+        HINT_OUTPUT(HO_TABLE);
+    }
+    //兩邊準備
+    HO_TABLE = WRITE_HO_TABLE();
+    HINT_OUTPUT(HO_TABLE);
+    delay(65535);//
+    return;
+}
+
+void PROCESS_ONE(void){
+    TTTO_TABLE = TTT_START(TTTO_TABLE); // include
+    while(TTTO_TABLE.DETWINNER == 0){
+        ADC_INTERUPT();
+        INPUT_CHECK();
+        TTT_OUTPUT(TTTO_TABLE);// include 顯示游戲過程
+    }
+
+    if(TTTO_TABLE.DETWINNER == 1){
+        //PIE1bits.ADIE = 0;
+        TTT_OUTPUT(TTTO_TABLE); // include 顯示winner
+    }
+    delay(65535);//
+    return;
+
+}
+//process 3 game2
+void PROCESS_THREE(void){
+    REACTION_OUTPUT_TABLE_INITIALIZE();
+    REACTO_TABLE = REACTION_START(REACTO_TABLE); //  填寫 random number
+//    T2CONbits.TMR2ON = 1;
+    while(REACTO_TABLE.PLAYER1_STATE != 2 || REACTO_TABLE.PLAYER2_STATE !=2){
+        if((REACTO_TABLE.PLAYER1_STATE == 0 && REACTO_TABLE.PLAYER2_STATE == 0) || (REACTO_TABLE.PLAYER1_STATE == 2 && REACTO_TABLE.PLAYER2_STATE == 0)){
+            REACTO_TABLE.tick100us = 0;
+//            TMR2 = 0;
+        }
+        INPUT_CHECK();
+        REACTO_TABLE = REACTION_UPDATE(REACTO_TABLE); //include
+        REACTION_OUTPUT(REACTO_TABLE);//過程
+        REACTO_TABLE.tick100us = REACTO_TABLE.tick100us + 1000;//0.0001
+    }
+//    T2CONbits.TMR2ON = 0;
+    REACTO_TABLE = REACTION_UPDATE(REACTO_TABLE); //include
+    REACTION_OUTPUT(REACTO_TABLE);//過程
+    delay(65535);
+    REACTO_TABLE = REACTION_UPDATE_WHO_WIN(REACTO_TABLE);
+    REACTION_OUTPUT(REACTO_TABLE);//顯示誰結束
+    delay(65535);
+    return;
+}
+
+void PROCESS_FIVE(void){
+    WHAC_A_MOLE_OUTPUT_TABLE_INITIALIZE();
+    //WAWO_TABLE = WHAC_A_MOLE_START(WAWO_TABLE);
+//    T2CONbits.TMR2ON = 1;
+    while(WAWO_TABLE.PLAYER1_STATE!=2 || WAWO_TABLE.PLAYER2_STATE != 2){
+        
+        INPUT_CHECK();
+        
+        if(WAWO_TABLE.PLAYER1_STATE == 1 && WAWO_TABLE.PLAYER2_STATE == 0){
+            INPUT_CHECK_2();
+        }
+        else if(WAWO_TABLE.PLAYER1_STATE == 2 && WAWO_TABLE.PLAYER2_STATE == 1){
+            INPUT_CHECK_2();
+        }
+
+
+        if((WAWO_TABLE.PLAYER1_STATE == 0 && WAWO_TABLE.PLAYER2_STATE == 0) || (WAWO_TABLE.PLAYER1_STATE == 2 && WAWO_TABLE.PLAYER2_STATE == 0)){
+            WAWO_TABLE.tick100us = 0;
+//            TMR2 =0;
+        }
+        WAWO_TABLE = WHAC_A_MOLE_UPDATE(WAWO_TABLE);
+        if(WAWO_TABLE.REMAINING_TIME<=0){
+            if(WAWO_TABLE.PLAYER1_STATE == 1 && WAWO_TABLE.PLAYER2_STATE == 0){
+                WAWO_TABLE.PLAYER1_STATE = 2;
+            }
+            else if(WAWO_TABLE.PLAYER1_STATE == 2 && WAWO_TABLE.PLAYER2_STATE == 1){
+                WAWO_TABLE.PLAYER2_STATE = 2;
+            }
+        }
+        WHAC_A_MOLE_OUTPUT(WAWO_TABLE);// if 00 - 10 or 20 - 21 remaning time need to be reset
+        WAWO_TABLE.tick100us = WAWO_TABLE.tick100us + 1000;
+        
+    }
+//    T2CONbits.TMR2ON = 0;
+    WAWO_TABLE = WHAC_A_MOLE_UPDATE(WAWO_TABLE);
+    WHAC_A_MOLE_OUTPUT(WAWO_TABLE);
+    delay(65535);//
+    WAWO_TABLE = WHAC_A_MOLE_UPDATE_WHO_WIN(WAWO_TABLE);
+    WHAC_A_MOLE_OUTPUT(WAWO_TABLE);
+    delay(65535);//
+    return;
+}
+
+void main(void){   
+    GC_TABLE_INITIALIZE();
+    EO_TABLE_INITIALIZE();
+    UART_INITIALIZE();// include
+    //CONFIG_INITIALIZE();
+    START_OUTPUT();//include
+    INPUT_TABLE_INITIALIZE();
+
+    //wait p1 press to start the game;
+    while(GC_TABLE.PROCESS != 0){
+        INPUT_CHECK();
+    }
+
+    //process 0
+    if(GC_TABLE.PROCESS == 0 && GC_TABLE.GAME_STATE == 1){
+        PROCESS_HINT();
+    }
+
+    GC_TABLE.PROCESS++;
+    CLEAR_PRESS(&GC_TABLE);
+
+    //GAME 1 PROCESS 1
+    if(GC_TABLE.PROCESS == 1 && GC_TABLE.GAME_STATE == 1){
+//        PIE1bits.ADIE = 1;
+        PROCESS_ONE();// game 1 is playing
+    }
+
+    if(TTTO_TABLE.CURPLAYER == 0 && TTTO_TABLE.DETWINNER == 1){
+        EO_TABLE.P1_WIN_AMOUNT++;
+
+    }
+    else if(TTTO_TABLE.CURPLAYER == 1 && TTTO_TABLE.DETWINNER == 1){
+        EO_TABLE.P2_WIN_AMOUNT++;
+    }
+
+    
+
+    GC_TABLE.PROCESS++;
+    GC_TABLE.GAME_STATE++;
+    CLEAR_PRESS(&GC_TABLE);
+
+    if(GC_TABLE.PROCESS == 2 && GC_TABLE.GAME_STATE == 2){
+        PROCESS_HINT();
+    }
+
+    GC_TABLE.PROCESS++;
+    CLEAR_PRESS(&GC_TABLE);
+
+    if(GC_TABLE.PROCESS == 3 && GC_TABLE.GAME_STATE == 2){
+        PROCESS_THREE(); //game 2 is playing
+    }
+    
+    if(REACTO_TABLE.WINNER == 1){
+        EO_TABLE.P1_WIN_AMOUNT++;
+    }
+    else if(REACTO_TABLE.WINNER == 2){
+        EO_TABLE.P2_WIN_AMOUNT++;
+    }
+    else if(REACTO_TABLE.WINNER == -1){
+        //errpr
+    }
+
+    GC_TABLE.PROCESS++;
+    GC_TABLE.GAME_STATE++;
+    CLEAR_PRESS(&GC_TABLE);
+
+    if(GC_TABLE.PROCESS == 4 && GC_TABLE.GAME_STATE == 3){
+        PROCESS_HINT(); //game 2 is playing
+    }
+
+    GC_TABLE.PROCESS++;
+    CLEAR_PRESS(&GC_TABLE);
+
+    if(GC_TABLE.PROCESS == 5 && GC_TABLE.GAME_STATE == 3){
+        PROCESS_FIVE(); //game 3 is playing
+    }
+
+    if(WAWO_TABLE.WINNER == 1){
+        EO_TABLE.P1_WIN_AMOUNT++;
+    }
+    else if(WAWO_TABLE.WINNER == 2){
+        EO_TABLE.P2_WIN_AMOUNT++;
+    }
+    else if(WAWO_TABLE.WINNER == -1){
+        //error
+    }
+
+    if(EO_TABLE.P1_WIN_AMOUNT > EO_TABLE.P2_WIN_AMOUNT){
+        EO_TABLE.WHO_WIN = 1;
+    }
+    else if(EO_TABLE.P1_WIN_AMOUNT < EO_TABLE.P2_WIN_AMOUNT){
+        EO_TABLE.WHO_WIN = 2;
+    }
+    else{
+        EO_TABLE.WHO_WIN = 0;
+    }
+
+    GC_TABLE.PROCESS++;
+//    INTCONbits.INT0IE = 0;
+//    INTCON3bits.INT1IE = 0;
+    while(1){
+        END_OUTPUT(EO_TABLE);//include
+    }
+}
+
+
+void BUTTON1_INTERUPT(void){
+    if(GC_TABLE.PROCESS == -1){
+        GC_TABLE.GAME_STATE++;
+        GC_TABLE.PROCESS++;
+        return;
+    }
+
+    if(GC_TABLE.PROCESS == 0 || GC_TABLE.PROCESS == 2 || GC_TABLE.PROCESS == 4){
+        GC_TABLE.P1_PRESS = 1;
+        return;
+    }
+
+    if(GC_TABLE.PROCESS == 1){
+        TTTO_TABLE = TTT_UPDATE(TTTO_TABLE,1,0,TTTO_TABLE.CURSOR);// update TTT_UPDATE(TTT_OUTPUT_TABLE,P1_PRESS,P2_PRESS,ADRESH) return output table include
+        return;
+    }
+
+    if(GC_TABLE.PROCESS == 3){
+        if(REACTO_TABLE.PLAYER1_STATE == 0 && REACTO_TABLE.PLAYER2_STATE == 0){
+            REACTO_TABLE.PLAYER1_STATE = 1 ;
+        }
+        else if(REACTO_TABLE.PLAYER1_STATE == 1 && REACTO_TABLE.PLAYER2_STATE == 0){
+            REACTO_TABLE.PLAYER1_STATE = 2 ;
+        }
+        return;
+    }
+
+    if(GC_TABLE.PROCESS == 5){
+        if(WAWO_TABLE.PLAYER1_STATE == 0 && WAWO_TABLE.PLAYER2_STATE == 0){
+            WAWO_TABLE.PLAYER1_STATE = 1 ;
+        }
+        else if(WAWO_TABLE.PLAYER1_STATE == 1 && WAWO_TABLE.PLAYER2_STATE == 0){
+            WAWO_TABLE.PLAYER1_STATE = 2;
+        }
+        return;
+    }
+    return;
+}
+
+void BUTTON2_INTERUPT(void){
+    if(GC_TABLE.PROCESS == -1){
+        return;
+    }
+    
+    if(GC_TABLE.PROCESS == 0 || GC_TABLE.PROCESS == 2 || GC_TABLE.PROCESS == 4){
+        GC_TABLE.P2_PRESS = 1;
+        return;
+    }
+
+    if(GC_TABLE.PROCESS == 1){
+        TTTO_TABLE = TTT_UPDATE(TTTO_TABLE,0,1,TTTO_TABLE.CURSOR);
+        return;
+    }
+
+        if(GC_TABLE.PROCESS == 3  ){
+        if(REACTO_TABLE.PLAYER1_STATE == 2 && REACTO_TABLE.PLAYER2_STATE == 0){
+            REACTO_TABLE.PLAYER2_STATE = 1 ;
+        }
+        else if(REACTO_TABLE.PLAYER1_STATE == 2 && REACTO_TABLE.PLAYER2_STATE == 1){
+            REACTO_TABLE.PLAYER2_STATE = 2;
+        }
+        return;
+        }
+    
+        if(GC_TABLE.PROCESS == 5){
+        if(WAWO_TABLE.PLAYER1_STATE == 2 && WAWO_TABLE.PLAYER2_STATE == 0){
+            WAWO_TABLE.PLAYER2_STATE = 1 ;
+        }
+        else if(WAWO_TABLE.PLAYER1_STATE == 2 && WAWO_TABLE.PLAYER2_STATE == 1){
+            WAWO_TABLE.PLAYER2_STATE = 2;
+        }
+        // 2 2 donothing
+        return;
+    }
+    return;
+}
+void ADC_INTERUPT(void){
+    printf("請輸入1個整數 (用空白或換行分隔)ADC: ");
+    scanf("%d", &INPUT_TABLE.adc_value);
+    GC_TABLE.ADC_VALUE = INPUT_TABLE.adc_value;
+    TTTO_TABLE.CURSOR = GC_TABLE.ADC_VALUE / 114;
+    return;
+}
+
+void UART_INTERUPT(void){
+    if(GC_TABLE.PROCESS == 5){
+        if(INPUT_TABLE.input_char != '1' && INPUT_TABLE.input_char != '2' && INPUT_TABLE.input_char != '3' && INPUT_TABLE.input_char != '4' && INPUT_TABLE.input_char != '5' && INPUT_TABLE.input_char != '6' && INPUT_TABLE.input_char != '7' && INPUT_TABLE.input_char != '8' && INPUT_TABLE.input_char != '9' ){
+            WAWO_TABLE.INPUT = 'N';
+        }
+        else{
+            WAWO_TABLE.INPUT = INPUT_TABLE.input_char;
+            WAWO_TABLE = WHAC_A_MOLE_UPDATE(WAWO_TABLE);
+            WHAC_A_MOLE_OUTPUT(WAWO_TABLE);
+            delay(5000);
+            WAWO_TABLE.INPUT = 'N';
+        }
+        return;
+    }  
+    return;
+}

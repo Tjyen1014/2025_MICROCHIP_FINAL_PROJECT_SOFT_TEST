@@ -1,0 +1,105 @@
+#ifndef INTERFACE_H 
+#define INTERFACE_H
+
+typedef struct{
+    int PROCESS; //-1 0 1/ 2 3/ 4 5/ 6
+    int GAME_STATE;
+    int P1_PRESS;
+    int P2_PRESS;
+    int ADC_VALUE;
+} GAME_CONTROL_TABLE;
+
+typedef struct {
+    int GAME_STATE;
+    int P1_PREPARE;
+    int P2_PREPARE;
+}HINT_OUTPUT_TABLE;
+
+typedef struct {
+        /***
+        board: 0 is O, 1 is X, -1 is non-fill
+        0,1,2
+        3,4,5
+        6,7,8
+        curplayer: 0 is O, 1 is X (who lead board change this time)
+        detwinner: 0 no winner, 1 has winner
+        success: the move legal or not
+    ***/
+	int BOARD[9];
+	int CURPLAYER;
+	int DETWINNER;
+	int SUCCESS;
+    int CURSOR;
+} TTT_OUTPUT_TABLE;
+
+typedef struct {
+	int RANDOM_NUMBER;
+	int DISPLAY_NUMBER_1;
+	int DISPLAY_NUMBER_2;
+    int P1_RESULT;
+    int P2_RESULT;
+    int WINNER;// -1 eeror ,0 draw ,1 p1 win ,2 p2win
+    unsigned long tick100us;//0.0001s //-
+    int PLAYER1_STATE; //-
+    int PLAYER2_STATE;//-
+} REACTION_OUTPUT_TABLE;
+
+typedef struct {
+	int SCORE_P1;
+  int SCORE_P2;
+	int WHAC_A_MOLE[9];
+	char INPUT;
+	int HIT;
+	int MISS;
+	int NOT_HIT_NOT_MISS;
+	long REMAINING_TIME; // 0.001us 
+  int WINNER;// -1 eeror ,0 draw ,1 p1 win ,2 p2win
+  unsigned long tick100us;//0.001s //-
+	int PLAYER1_STATE;//-
+	int PLAYER2_STATE;//-
+}WHAC_A_MOLE_OUTPUT_TABLE;
+
+typedef struct {
+    int WHO_WIN; // -1 eeror ,0 draw ,1 p1 win ,2 p2win
+    int P1_WIN_AMOUNT;
+    int P2_WIN_AMOUNT;
+}END_OUTPUT_TABLE;
+
+#define STATE_IDLE 0
+#define STATE_PLAYING 1
+#define STATE_GAMEOVER 2
+//test
+void INPUT_TABLE_INITIALIZE(void);
+void INPUT_CHECK(void);
+void INPUT_CHECK_2(void);
+void BUTTON1_INTERUPT(void);
+void BUTTON2_INTERUPT(void);
+void ADC_INTERUPT(void);
+void UART_INTERUPT(void);
+
+//UART
+void UART_INITIALIZE(void);
+void START_OUTPUT(void);
+void HINT_OUTPUT(HINT_OUTPUT_TABLE HO_TABLE);
+void TTT_OUTPUT(TTT_OUTPUT_TABLE TTTO_TABLE);
+void REACTION_OUTPUT(REACTION_OUTPUT_TABLE REACTO_TABLE);
+void WHAC_A_MOLE_OUTPUT(WHAC_A_MOLE_OUTPUT_TABLE WAWO_TABLE);
+void END_OUTPUT(END_OUTPUT_TABLE EO_TABLE);
+
+//TTT
+TTT_OUTPUT_TABLE TTT_START(TTT_OUTPUT_TABLE TTTO_TABLE);// initialize
+TTT_OUTPUT_TABLE TTT_UPDATE(TTT_OUTPUT_TABLE TTTO_TABLE,int P1_PRESS,int P2_PRESS,int CURSOR);
+
+
+//REACTION GAME
+REACTION_OUTPUT_TABLE REACTION_START(REACTION_OUTPUT_TABLE REACTO_TABLE); 
+REACTION_OUTPUT_TABLE REACTION_UPDATE(REACTION_OUTPUT_TABLE REACTO_TABLE);
+REACTION_OUTPUT_TABLE REACTION_UPDATE_WHO_WIN(REACTION_OUTPUT_TABLE REACTO_TABLE);
+
+//WAM
+//WHAC_A_MOLE_OUTPUT_TABLE WHAC_A_MOLE_START(WHAC_A_MOLE_OUTPUT_TABLE WAWO_TABLE);//initialize
+WHAC_A_MOLE_OUTPUT_TABLE WHAC_A_MOLE_UPDATE(WHAC_A_MOLE_OUTPUT_TABLE WAWO_TABLE);
+WHAC_A_MOLE_OUTPUT_TABLE WHAC_A_MOLE_UPDATE_WHO_WIN(WHAC_A_MOLE_OUTPUT_TABLE WAWO_TABLE);
+
+
+#endif
